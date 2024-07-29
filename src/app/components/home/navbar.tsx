@@ -47,6 +47,11 @@ export default function NavBar() {
             )}
             {user && (
               <li>
+                <Link href={`/user-profile/${user.uid}`}>User Profile</Link>
+              </li>
+            )}
+            {user && (
+              <li>
                 <button onClick={() => signOut(auth)}>Sign Out</button>
               </li>
             )}
