@@ -2,6 +2,7 @@
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/app/firebase/config";
+import ProfileForm from "@/app/components/forms/profile-update-form";
 
 export default function userProfile({ params }: { params: { id: string } }) {
   const [user, loading, error] = useAuthState(auth);
@@ -29,6 +30,8 @@ export default function userProfile({ params }: { params: { id: string } }) {
           <h2>Phone Number : {user?.phoneNumber || "None"}</h2>
         </div>
       </div>
+      <h1 className="mt-7">Update Profile</h1>
+      <ProfileForm></ProfileForm>
     </div>
   );
 }
