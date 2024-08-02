@@ -1,10 +1,19 @@
 "use client";
 
 import { SubmitHandler, useForm } from "react-hook-form";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, updateProfile } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import SuccessModal from "../modals/success-modal";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
 
 const schema = z.object({
   name: z.string(),
@@ -20,7 +29,20 @@ const schema = z.object({
         message: "Invalid phone number format",
       }
     ),
-  profilePic: z.instanceof(FileList),
+  profilePic: z
+    .unknown()
+    .transform((value) => {
+      return value as FileList;
+    })
+    .refine(
+      (file) => file.length === 0 || file[0].size <= MAX_FILE_SIZE, // checking if length is zero because after submission it seems to submit again? not sure
+      `Max image size is rougly 5MB give or take.`
+    )
+    .refine(
+      (file) =>
+        file.length === 0 || ACCEPTED_IMAGE_TYPES.includes(file[0].type),
+      "Only .jpg, .jpeg, .png and .webp formats are supported."
+    ),
 });
 
 type FormFields = z.infer<typeof schema>;
@@ -38,13 +60,31 @@ export default function ProfileForm() {
   const router = useRouter();
 
   const onSubmit: SubmitHandler<FormFields> = async (data) => {
-    console.log(data);
-    reset();
+    const currentUser = auth.currentUser;
+
+    if (currentUser) {
+      try {
+        await updateProfile(currentUser, {
+          displayName: data.name,
+          photoURL:
+            "https://images.pexels.com/photos/907607/pexels-photo-907607.png?auto=compress&cs=tinysrgb&w=600",
+        });
+        console.log("Profile updated!");
+      } catch (error) {
+        console.error("An error occurred", error);
+      }
+    } else {
+      console.error("No user is currently logged in.");
+    }
   };
 
   return (
     <div>
+      <SuccessModal message="User Updated Successfully"></SuccessModal>
       <form onSubmit={handleSubmit(onSubmit)}>
+        {errors.root && (
+          <div className="text-red-500">{errors.root.message}</div>
+        )}
         <div className="my-3">
           <label className="input input-bordered flex items-center gap-2">
             Name
@@ -99,10 +139,6 @@ export default function ProfileForm() {
             Update
           </button>
         </div>
-
-        {errors.root && (
-          <div className="text-red-500">{errors.root.message}</div>
-        )}
       </form>
     </div>
   );
