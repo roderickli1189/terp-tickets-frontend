@@ -3,6 +3,7 @@
 import { SubmitHandler, useForm } from "react-hook-form";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -25,13 +26,6 @@ const schema = z
   });
 
 type FormFields = z.infer<typeof schema>;
-/*
-type FormFields = {
-  password: string;
-  verifyPassword: string;
-  email: string;
-};
-*/
 
 export default function SignUpForm() {
   const {
@@ -44,19 +38,22 @@ export default function SignUpForm() {
 
   const auth = getAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit: SubmitHandler<FormFields> = (data) => {
-    createUserWithEmailAndPassword(auth, data.email, data.password)
-      .then((userCredential) => {
-        const user = userCredential.user;
-        reset();
-        router.push("/");
-      })
-      .catch((error) => {
-        setError("root", {
-          message: error.message,
-        });
+  const onSubmit: SubmitHandler<FormFields> = async (data) => {
+    setLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, data.email, data.password);
+      reset();
+      router.push("/login");
+    } catch (error: any) {
+      setError("root", {
+        type: "manual",
+        message: error.message,
       });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -111,8 +108,12 @@ export default function SignUpForm() {
         )}
 
         <div className="my-3 flex justify-center">
-          <button disabled={isSubmitting} type="submit" className="btn">
-            {isSubmitting ? "Loading..." : "Sign Up"}
+          <button disabled={loading} type="submit" className="btn">
+            {loading ? (
+              <span className="loading loading-dots loading-lg"></span>
+            ) : (
+              "Sign Up"
+            )}
           </button>
         </div>
 
