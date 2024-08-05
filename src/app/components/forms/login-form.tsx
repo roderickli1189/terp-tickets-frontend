@@ -5,6 +5,7 @@ import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 
 const schema = z.object({
   email: z
@@ -27,19 +28,26 @@ export default function LoginForm() {
 
   const auth = getAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   const onSubmit: SubmitHandler<FormFields> = async (data) => {
-    signInWithEmailAndPassword(auth, data.email, data.password)
-      .then((userCredential) => {
-        const user = userCredential.user;
-        reset();
-        router.push("/");
-      })
-      .catch((error) => {
-        setError("root", {
-          message: error.message,
-        });
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+      const user = userCredential.user;
+      reset();
+      router.push("/");
+    } catch (error: any) {
+      setError("root", {
+        message: error.message,
       });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,8 +86,12 @@ export default function LoginForm() {
         )}
 
         <div className="my-3 flex justify-center">
-          <button type="submit" className="btn">
-            Login
+          <button disabled={loading} type="submit" className="btn">
+            {loading ? (
+              <span className="loading loading-dots loading-lg"></span>
+            ) : (
+              "Login"
+            )}
           </button>
         </div>
 

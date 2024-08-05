@@ -6,6 +6,22 @@ import ProfileForm from "@/app/components/forms/profile-update-form";
 
 export default function userProfile({ params }: { params: { id: string } }) {
   const [user, loading, error] = useAuthState(auth);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center">
+        <p>Loading...</p>
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center">
+        <p>User not authenticated</p>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col justify-center items-center">
       <h1 className="mb-5">User Profile</h1>
@@ -31,7 +47,7 @@ export default function userProfile({ params }: { params: { id: string } }) {
         </div>
       </div>
       <h1 className="mt-7">Update Profile</h1>
-      <ProfileForm></ProfileForm>
+      <ProfileForm user={user}></ProfileForm>
     </div>
   );
 }

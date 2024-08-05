@@ -1,11 +1,14 @@
 "use client";
 
 import { SubmitHandler, useForm } from "react-hook-form";
-import { getAuth, updateProfile } from "firebase/auth";
+import { getAuth, updateProfile, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import SuccessModal from "../modals/success-modal";
+import { useState } from "react";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/app/firebase/config";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
@@ -15,39 +18,36 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/webp",
 ];
 
-const schema = z.object({
-  name: z.string(),
-  phoneNumber: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        const regex = /^\d{3}-\d{3}-\d{4}$/;
-        return !val || regex.test(val);
-      },
-      {
-        message: "Invalid phone number format",
-      }
-    ),
-  profilePic: z
-    .unknown()
-    .transform((value) => {
-      return value as FileList;
-    })
-    .refine(
-      (file) => file.length === 0 || file[0].size <= MAX_FILE_SIZE, // checking if length is zero because after submission it seems to submit again? not sure
-      `Max image size is rougly 5MB give or take.`
-    )
-    .refine(
-      (file) =>
-        file.length === 0 || ACCEPTED_IMAGE_TYPES.includes(file[0].type),
-      "Only .jpg, .jpeg, .png and .webp formats are supported."
-    ),
-});
+const schema = z
+  .object({
+    name: z.string(),
+    profilePic: z
+      .unknown()
+      .transform((value) => {
+        return value as FileList;
+      })
+      .refine(
+        (file) => file.length === 0 || file[0].size <= MAX_FILE_SIZE, // checking if length is zero because after submission it seems to submit again? not sure
+        `Max image size is rougly 5MB give or take.`
+      )
+      .refine(
+        (file) =>
+          file.length === 0 || ACCEPTED_IMAGE_TYPES.includes(file[0].type),
+        "Only .jpg, .jpeg, .png and .webp formats are supported."
+      ),
+  })
+  .refine((data) => data.name.trim() !== "" || data.profilePic.length > 0, {
+    message: "form cannot be empty",
+    path: ["name"], // Idk how to make it show up in root seems to only work for schema def vars
+  });
 
 type FormFields = z.infer<typeof schema>;
 
-export default function ProfileForm() {
+type ProfileFormProps = {
+  user: User;
+};
+
+const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
   const {
     register,
     handleSubmit,
@@ -58,20 +58,44 @@ export default function ProfileForm() {
 
   const auth = getAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   const onSubmit: SubmitHandler<FormFields> = async (data) => {
     const currentUser = auth.currentUser;
-
     if (currentUser) {
+      setLoading(true);
       try {
-        await updateProfile(currentUser, {
-          displayName: data.name,
-          photoURL:
-            "https://images.pexels.com/photos/907607/pexels-photo-907607.png?auto=compress&cs=tinysrgb&w=600",
+        const payload: { displayName?: string; photoURL?: string } = {};
+        if (data.name) {
+          payload.displayName = data.name;
+        }
+        if (data.profilePic) {
+          const picture = data.profilePic[0];
+
+          const storageRef = ref(
+            storage,
+            `users/${user?.uid}/profilePicture.png`
+          );
+
+          const snapshot = await uploadBytes(storageRef, picture);
+
+          const downloadURL = await getDownloadURL(snapshot.ref);
+
+          payload.photoURL = downloadURL;
+        }
+        await updateProfile(currentUser, payload);
+        const modal = document.getElementById("success") as HTMLDialogElement;
+        reset();
+        modal.showModal();
+        modal.addEventListener("close", () => {
+          window.location.reload();
         });
-        console.log("Profile updated!");
-      } catch (error) {
-        console.error("An error occurred", error);
+      } catch (error: any) {
+        setError("root", {
+          message: error.message,
+        });
+      } finally {
+        setLoading(false);
       }
     } else {
       console.error("No user is currently logged in.");
@@ -82,9 +106,6 @@ export default function ProfileForm() {
     <div>
       <SuccessModal message="User Updated Successfully"></SuccessModal>
       <form onSubmit={handleSubmit(onSubmit)}>
-        {errors.root && (
-          <div className="text-red-500">{errors.root.message}</div>
-        )}
         <div className="my-3">
           <label className="input input-bordered flex items-center gap-2">
             Name
@@ -99,22 +120,6 @@ export default function ProfileForm() {
 
         {errors.name && (
           <div className="text-red-500">{errors.name.message}</div>
-        )}
-
-        <div className="my-3">
-          <label className="input input-bordered flex items-center gap-2">
-            Phone Number
-            <input
-              {...register("phoneNumber")}
-              type="tel"
-              className="grow"
-              placeholder="123-456-7890"
-            />
-          </label>
-        </div>
-
-        {errors.phoneNumber && (
-          <div className="text-red-500">{errors.phoneNumber.message}</div>
         )}
 
         <div className="my-3">
@@ -135,11 +140,21 @@ export default function ProfileForm() {
         )}
 
         <div className="my-3 flex justify-center">
-          <button type="submit" className="btn">
-            Update
+          <button disabled={loading} type="submit" className="btn">
+            {loading ? (
+              <span className="loading loading-dots loading-lg"></span>
+            ) : (
+              "Update"
+            )}
           </button>
         </div>
+
+        {errors.root && (
+          <div className="text-red-500">{errors.root.message}</div>
+        )}
       </form>
     </div>
   );
-}
+};
+
+export default ProfileForm;

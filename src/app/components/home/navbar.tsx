@@ -4,10 +4,20 @@ import Link from "next/link";
 import { signOut } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/app/firebase/config";
+import { useRouter } from "next/navigation";
 
 export default function NavBar() {
+  const router = useRouter();
   const [user] = useAuthState(auth);
-
+  const handleSignOut = async () => {
+    // display a loading while the signOut is being awaited
+    try {
+      await signOut(auth);
+      router.push("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
   return (
     <div className="navbar bg-base-100">
       <div className="navbar-start">
@@ -52,7 +62,7 @@ export default function NavBar() {
             )}
             {user && (
               <li>
-                <button onClick={() => signOut(auth)}>Sign Out</button>
+                <button onClick={handleSignOut}>Sign Out</button>
               </li>
             )}
           </ul>
