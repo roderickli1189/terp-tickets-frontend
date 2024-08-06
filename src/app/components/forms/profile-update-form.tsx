@@ -69,7 +69,8 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
         if (data.name) {
           payload.displayName = data.name;
         }
-        if (data.profilePic) {
+        if (data.profilePic.length == 1) {
+          console.log("detected image");
           const picture = data.profilePic[0];
 
           const storageRef = ref(

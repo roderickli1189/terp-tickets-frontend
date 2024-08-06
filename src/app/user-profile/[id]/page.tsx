@@ -3,10 +3,11 @@
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/app/firebase/config";
 import ProfileForm from "@/app/components/forms/profile-update-form";
+import { useRouter } from "next/navigation";
 
 export default function userProfile({ params }: { params: { id: string } }) {
   const [user, loading, error] = useAuthState(auth);
-
+  const router = useRouter();
   if (loading) {
     return (
       <div className="flex flex-col items-center">
@@ -16,9 +17,12 @@ export default function userProfile({ params }: { params: { id: string } }) {
     );
   }
   if (!user) {
+    router.push("/login");
     return (
+      // if i dont include a return here type script will say the user param I pass into profile form is possible null
       <div className="flex flex-col items-center">
-        <p>User not authenticated</p>
+        <p>Loading...</p>
+        <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
   }
@@ -43,7 +47,6 @@ export default function userProfile({ params }: { params: { id: string } }) {
         <div className="card-body items-center text-center">
           <h2>Name : {user?.displayName || "None"}</h2>
           <h2>Email : {user?.email || "None"}</h2>
-          <h2>Phone Number : {user?.phoneNumber || "None"}</h2>
         </div>
       </div>
       <h1 className="mt-7">Update Profile</h1>

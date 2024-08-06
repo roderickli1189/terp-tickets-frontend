@@ -62,6 +62,11 @@ export default function NavBar() {
             )}
             {user && (
               <li>
+                <Link href={"/create-listing"}>Create Listing</Link>
+              </li>
+            )}
+            {user && (
+              <li>
                 <button onClick={handleSignOut}>Sign Out</button>
               </li>
             )}
