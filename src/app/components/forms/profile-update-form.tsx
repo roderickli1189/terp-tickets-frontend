@@ -8,7 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import SuccessModal from "../modals/success-modal";
 import { useState } from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/app/firebase/config";
+import { storage, db } from "@/app/firebase/config";
+import { doc, updateDoc } from "firebase/firestore";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
@@ -70,7 +71,6 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
           payload.displayName = data.name;
         }
         if (data.profilePic.length == 1) {
-          console.log("detected image");
           const picture = data.profilePic[0];
 
           const storageRef = ref(
@@ -85,8 +85,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
           payload.photoURL = downloadURL;
         }
         await updateProfile(currentUser, payload);
-        const modal = document.getElementById("success") as HTMLDialogElement;
+        const userRef = doc(db, "users", user.uid);
+
+        await updateDoc(userRef, payload);
+
         reset();
+        const modal = document.getElementById("success") as HTMLDialogElement;
         modal.showModal();
         modal.addEventListener("close", () => {
           window.location.reload();

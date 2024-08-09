@@ -7,6 +7,15 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import SuccessModal from "../modals/success-modal";
 import { useState } from "react";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from "uuid";
+import { storage, db } from "@/app/firebase/config";
+import {
+  collection,
+  addDoc,
+  Timestamp,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
@@ -20,6 +29,7 @@ const schema = z.object({
   event: z.string().min(1, { message: "Event type required" }),
   date: z.string().min(1, { message: "Date required" }),
   description: z.string().min(1, { message: "Description required" }),
+  price: z.string().min(1, { message: "Price required" }),
   ticket: z
     .unknown()
     .transform((value) => value as FileList)
@@ -68,16 +78,31 @@ const ListingForm: React.FC<ProfileFormProps> = ({ user }) => {
   const onSubmit: SubmitHandler<FormFields> = async (data) => {
     setLoading(true);
     try {
-      const apiURL = "http://localhost:8000/create-listing";
-      const response = await fetch(apiURL, {
-        method: "POST",
-        headers: { "Content-type": "application/JSON" },
-        body: JSON.stringify(data),
+      console.log(data);
+      const picture = data.ticket[0];
+      const uniqueFilename = `${uuidv4()}.png`;
+      const storageRef = ref(
+        storage,
+        `users/${user?.uid}/tickets/${uniqueFilename}`
+      );
+      const snapshot = await uploadBytes(storageRef, picture);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      // Add a new document with a generated id.
+      const docRef = await addDoc(collection(db, "listings"), {
+        event: data.event,
+        description: data.description,
+        price: parseFloat(data.price),
+        date: Timestamp.fromDate(new Date(data.date)),
+        ticket: downloadURL,
+        userID: user.uid,
+        userName: user.displayName,
+        userGmail: user.email,
+        postDate: serverTimestamp(),
       });
-      if (!response.ok) {
-        throw new Error("Error with creating listing"); //later come back and return the proper error message
-      }
-      console.log("api was successfully reached");
+      reset();
+      const modal = document.getElementById("success") as HTMLDialogElement;
+      modal.showModal();
     } catch (error: any) {
       setError("root", {
         message: error.message,
@@ -90,7 +115,7 @@ const ListingForm: React.FC<ProfileFormProps> = ({ user }) => {
 
   return (
     <div>
-      <SuccessModal message="User Updated Successfully"></SuccessModal>
+      <SuccessModal message="Listing Created Successfully"></SuccessModal>
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="my-3">
           <label className="form-control w-full max-w-xs">
@@ -148,6 +173,25 @@ const ListingForm: React.FC<ProfileFormProps> = ({ user }) => {
         <div className="my-3">
           <label className="form-control w-full max-w-xs">
             <div className="label">
+              <span className="label-text">Price</span>
+            </div>
+            <input
+              {...register("price")}
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              className="input input-bordered w-full max-w-xs"
+            />
+          </label>
+        </div>
+
+        {errors.price && (
+          <div className="text-red-500">{errors.price.message}</div>
+        )}
+
+        <div className="my-3">
+          <label className="form-control w-full max-w-xs">
+            <div className="label">
               <span className="label-text">Ticket Picture</span>
             </div>
             <input
@@ -167,7 +211,7 @@ const ListingForm: React.FC<ProfileFormProps> = ({ user }) => {
             {loading ? (
               <span className="loading loading-dots loading-lg"></span>
             ) : (
-              "Update"
+              "Submit"
             )}
           </button>
         </div>

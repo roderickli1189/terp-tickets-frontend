@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/app/firebase/config";
 
 const schema = z
   .object({
@@ -43,9 +45,22 @@ export default function SignUpForm() {
   const onSubmit: SubmitHandler<FormFields> = async (data) => {
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+      const user = userCredential.user;
+      //take this user and then create a user collection
+      const docData = {
+        email: data.email,
+        name: user.displayName,
+        photoURL: user.photoURL,
+        listings: [],
+      };
+      await setDoc(doc(db, "users", user.uid), docData);
       reset();
-      router.push("/login");
+      router.push("/");
     } catch (error: any) {
       setError("root", {
         type: "manual",
